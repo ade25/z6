@@ -57,7 +57,7 @@
       "title": "${sites:zope9}",
       "type": "plone",
       "port": "${ports:zope9}",
-      "url": "${hosts:zope89}"
+      "url": "${hosts:zope9}"
     }
   ]
 }
