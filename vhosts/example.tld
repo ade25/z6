@@ -1,43 +1,93 @@
-# vhost: ${hosts:zopeX} - ${sites:zopeX} - zopeX
+# vhost: ${hosts:zopeXX} - zopeXX
+
 
 server {
     listen *:${ports:http};
-    server_name www.${hosts:zopeX};
-    return 301 $scheme://${hosts:zopeX}$request_uri;
-}
-# Additional domains - remove if not needed
-server {
-    listen *:${ports:http};
-    server_name www.${hosts:zopeX-1};
-    return 301 $scheme://${hosts:zopeX}$request_uri;
+    server_name ${hosts:zopeXX} www.${hosts:zopeXX};
+    return 301 https://${hosts:zopeXX}$request_uri;
 }
 
-server {    
-    listen *:${ports:http};
-    server_name ${hosts:zopeX};
-    access_log ${buildout:directory}/var/log/${hosts:zopeX}.log;
-    root ${buildout:directory}/htdocs;
+# Enable for www rewrites - requires a valid cert for www.example.tld
+#server{
+#        listen  *:${ports:https} ssl http2;
+#        server_name www.${hosts:zopeXX};
+#        ssl_certificate /etc/letsencrypt/live/www.${hosts:zopeXX}/fullchain.pem;
+#        ssl_certificate_key /etc/letsencrypt/live/www.${hosts:zopeXX}/privkey.pem;
+#        return 301 https://${hosts:zopeXX}$request_uri;
+#}
+
+server {
+    listen *:${ports:https} ssl http2;
+    server_name ${hosts:zopeXX};
+    access_log ${buildout:directory}/var/log/${hosts:zopeXX}.log;
+    root ${zope-locations:zopeXX}/src/${sites:zopeXX}.sitetheme/${sites:zopeXX}/sitetheme/resources/dist;
     index index.html index.htm;
 
-    gzip             on;    
-    gzip_min_length  1000;
-    gzip_proxied     any;
-    gzip_types   text/plain text/css application/json application/x-javascript text/xml application/xml application/xml+rss text/javascript;
-    
+    ssl on;
+    ssl_certificate /etc/letsencrypt/live/${hosts:zopeXX}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${hosts:zopeXX}/privkey.pem;
+    ssl_verify_depth    3;
+
     error_page   502 503 504  /50x.html;
     location = /50x.html {
         internal;
     }
-    location ${urls:fallback} {
-        break;
+    location ~ /.well-known {
+        root ${buildout:directory}/htdocs/;
     }
-    
-    location / {
-        rewrite ^/(.*)$ /VirtualHostBase/http/${hosts:zopeX}:${ports:http}/${sites:zopeX}/VirtualHostRoot/$1 break;
+
+    location  ~ /manage(_.+)?$ {
+      deny all;
+    }
+
+    # Favicon support
+    location ~ ^/(apple-touch-icon|browserconfig|favicon|mstile|android-chrome|safari-pinned-tab|manifest)(.*)\.(png|xml|ico|svg|json)$ {
+        root ${zope-locations:zopeXX}/src/${sites:zopeXX}.sitetheme/${sites:zopeXX}/sitetheme/resources/dist/assets/ico;
+        include ${buildout:directory}/etc/disable_logging.conf;
+    }
+
+    location /styles/ {
+        root ${zope-locations:zopeXX}/src/${sites:zopeXX}.sitetheme/${sites:zopeXX}/sitetheme/resources/dist;
+        include ${buildout:directory}/etc/cache_control_assets.conf;
+    }
+    location /scripts/ {
+        root ${zope-locations:zopeXX}/src/${sites:zopeXX}.sitetheme/${sites:zopeXX}/sitetheme/resources/dist;
+        include ${buildout:directory}/etc/cache_control_assets.conf;
+    }
+    location /assets/ {
+        root ${zope-locations:zopeXX}/src/${sites:zopeXX}.sitetheme/${sites:zopeXX}/sitetheme/resources/dist/;
+        include ${buildout:directory}/etc/cache_control_assets.conf;
+    }
+
+    location @backend {
+        rewrite ^/(.*)$ /VirtualHostBase/https/${hosts:zopeXX}:${ports:https}/${sites:zopeXX}/VirtualHostRoot/$1 break;
+        # Back end (for SSL content)
         proxy_pass http://cache;
         proxy_connect_timeout 75;
         proxy_read_timeout 185;
         client_max_body_size 10m;
         client_body_timeout 1200;
+        proxy_set_header X-Real-IP  $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+    }
+
+    # Set expires max on static file types (make sure you are using cache busting filenames or query params):
+    location ~* ^.+\.(css|js|jpg|jpeg|gif|png|ico|gz|svg|svgz|ttf|otf|woff|eot|mp4|ogg|ogv|webm|pdf)$ {
+        try_files $uri @backend;
+        include ${buildout:directory}/etc/cache_control_assets.conf;
+    }
+
+    location / {
+        rewrite ^/(.*)$ /VirtualHostBase/https/${hosts:zopeXX}:${ports:https}/${sites:zopeXX}/VirtualHostRoot/$1 break;
+        # Back end (for SSL content)
+        proxy_pass http://cache;
+        proxy_connect_timeout 75;
+        proxy_read_timeout 185;
+        client_max_body_size 10m;
+        client_body_timeout 1200;
+        proxy_set_header X-Real-IP  $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
     }
 }
