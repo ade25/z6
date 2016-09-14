@@ -34,4 +34,4 @@ pip-selfcheck.json
 # Enable nginx specific settings
 !cache_control_assets.conf
 !disable_logging.conf
-!proxy_sesttings.conf
+!proxy_settings.conf
